@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>static-md-wiki</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #333;
+        }
+
+        #content {
+            border-top: 1px solid #eee;
+            margin-top: 1rem;
+        }
+
+        #nav {
+            margin-bottom: 2rem;
+            background: #f4f4f4;
+            padding: 1rem;
+            border-radius: 5px;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const contentDir = "content/";
+
+        /**
+         * Fetches markdown from a URL, renders it, and injects it into the DOM.
+         */
+        async function loadMarkdown(url) {
+            const contentDiv = document.getElementById('content');
+
+            try {
+                const response = await fetch(contentDir + url, { cache: "no-store"});
+                if (!response.ok) throw new Error(`: Could not fetch ${url} [${response.status}: ${response.statusText}]`);
+                
+                const markdown = await response.text();
+                // Render Markdown using Marked.js
+                contentDiv.innerHTML = marked.parse(markdown);
+
+                const cleanTitle = url.replace(/^\//, '').replace(/\.md$/, '');
+                document.title = cleanTitle;
+            } catch (err) {
+                contentDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
+            } finally {
+                // Update URL hash to allow bookmarking/back button (optional)
+                window.location.hash = url;
+            }
+        }
+
+        async function loadNavigation() {
+            try {
+                const navresponse = await fetch(contentDir + "navigation.md", { cache: "no-store"});
+                if (!navresponse.ok) throw new Error(`Could not fetch navigation.md`);
+
+                const navDiv = document.getElementById('nav');
+                const navmarkdown = await navresponse.text();
+                // Render Markdown using Marked.js
+                navDiv.innerHTML = marked.parse(navmarkdown);
+            } catch (err) {
+                console.log(err);
+            }
+        }
+
+        // Initial Load: Check hash or load default
+        window.addEventListener('DOMContentLoaded', () => {
+            marked.use({
+                gfm: true,
+                breaks: true, // Converts \n in paragraphs to <br> (GitHub style)
+                headerIds: true,
+                mangle: false
+            });
+
+            /**
+             * Intercepts clicks on <a> tags to rewrite local .md links
+             */
+            document.addEventListener('click', (e) => {
+                const target = e.target.closest('a');
+                if (!target) return;
+    
+                const href = target.getAttribute('href');
+    
+                // Check if the link is a local markdown file
+                if (href && href.toLowerCase().endsWith('.md') && !href.startsWith('http')) {
+                    e.preventDefault();
+                    loadMarkdown(href);
+                }
+            });
+    
+            // Handle back/forward browser buttons
+            window.addEventListener('hashchange', () => {
+                const file = window.location.hash.substring(1);
+                if (file) loadMarkdown(file);
+            });
+
+            loadNavigation();
+
+            // Load initial file
+            const initialFile = window.location.hash.substring(1) || 'index.md';
+            loadMarkdown(initialFile);
+        });
+
+    </script>
+</head>
+<body>
+
+    <div id="nav">
+        <a href="/index.md">Home</a>
+    </div>
+
+    <div id="content">Loading content...</div>
+
+</body>
+</html>
+
