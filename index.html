@@ -87,7 +87,7 @@
 
             try {
                 const response = await fetch(resolvedUrl, { cache: "no-store"});
-                if (!response.ok) throw new Error(`Could not fetch ${resolvedUrl.pathname} [${response.status}: ${response.statusText}]`);
+                if (!response.ok) throw new Error(`Could not fetch ${targetPath} [${response.status}: ${response.statusText}]`);
 
                 const markdown = await response.text();
 
@@ -98,7 +98,16 @@
                 // Render Markdown using Marked.js
                 contentDiv.innerHTML = marked.parse(markdown);
 
-                const filename = targetPath.split("/").at(-1);
+                const cleanTitle = resolvedUrl.pathname.replace(/\.md$/, '');
+                document.title = cleanTitle;
+            } catch (err) {
+                contentDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
+                navDiv.style.display = "none";
+            } finally {
+
+                // show navigation
+                const pathSplit = targetPath.split("/");
+                const filename = pathSplit ? pathSplit.at(-1) : targetPath;
                 const quarterParts = /^(\d{4})-Q(\d{1}).md$/.exec(filename);
                 if (quarterParts) {
                     const theyear = parseInt(quarterParts[1]);
@@ -118,19 +127,14 @@
                         nextquarter = 1;
                     }
 
-                    navDiv.innerHTML = marked.parse(`[⬅ ${prevyear}-Q${prevquarter}](${prevyear}-Q${prevquarter}.md)   [${nextyear}-Q${nextquarter} ⮕](${nextyear}-Q${nextquarter}.md)`);
+                    navDiv.innerHTML = marked.parse(`[&larr; ${prevyear}-Q${prevquarter}](${prevyear}-Q${prevquarter}.md)   [${nextyear}-Q${nextquarter} &rarr;](${nextyear}-Q${nextquarter}.md)`);
 
                     navDiv.style.display = "block";
                 } else {
                     navDiv.style.display = "none";
                 }
 
-                const cleanTitle = resolvedUrl.pathname.replace(/\.md$/, '');
-                document.title = cleanTitle;
-            } catch (err) {
-                contentDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
-                navDiv.style.display = "none";
-            } finally {
+
                 if (updateHistory) {
                     const newUrl = `${window.location.pathname}?page=${resolvedUrl.pathname}`;
                     window.history.pushState({ path: resolvedUrl.pathname }, "", newUrl);
