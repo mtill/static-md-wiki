@@ -37,37 +37,59 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        const contentDir = "content/";
+        const INITIAL_PAGE = 'index.md';
+        const CONTENT_REL_DIR = 'content/';
+        const APP_ROOT = new URL('./', document.baseURI).href;
+        const CONTENT_ROOT = new URL(CONTENT_REL_DIR, APP_ROOT).href;
+        let currentFileHref = new URL(INITIAL_PAGE, CONTENT_ROOT).href;
+
+        function getRelativePagePath(href) {
+            let out = new URL(href, currentFileHref).toString();
+            if (out.startsWith(CONTENT_ROOT)) {
+                return out.substring(CONTENT_ROOT.length);
+            }
+            console.log("dubious href: " + href);
+            return href;
+        }
 
         /**
          * Fetches markdown from a URL, renders it, and injects it into the DOM.
          */
-        async function loadMarkdown(url) {
+        async function loadMarkdown(targetPath, updateHistory = true) {
+            const resolvedUrl = new URL(targetPath, currentFileHref);
             const contentDiv = document.getElementById('content');
             // contentDiv.innerHTML = "Loading content...";
 
             try {
-                const response = await fetch(contentDir + url, { cache: "no-store"});
-                if (!response.ok) throw new Error(`: Could not fetch ${url} [${response.status}: ${response.statusText}]`);
-                
+                const response = await fetch(resolvedUrl, { cache: "no-store"});
+                if (!response.ok) throw new Error(`Could not fetch ${resolvedUrl.pathname} [${response.status}: ${response.statusText}]`);
+
                 const markdown = await response.text();
+
+                // Track the current path for the next relative resolution
+                // IMPORTANT: Set context BEFORE parsing so renderer uses the new path
+                currentFileHref = resolvedUrl.href;
+
                 // Render Markdown using Marked.js
                 contentDiv.innerHTML = marked.parse(markdown);
 
-                const cleanTitle = url.replace(/^\//, '').replace(/\.md$/, '');
+                const cleanTitle = resolvedUrl.pathname.replace(/\.md$/, '');
                 document.title = cleanTitle;
             } catch (err) {
                 contentDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
             } finally {
-                // Update URL hash to allow bookmarking/back button (optional)
-                window.location.hash = url;
+                if (updateHistory) {
+                    const newUrl = `${window.location.pathname}?page=${resolvedUrl.pathname}`;
+                    window.history.pushState({ path: resolvedUrl.pathname }, "", newUrl);
+                }
+                window.scrollTo(0, 0);
             }
         }
 
         async function loadNavigation() {
             const navDiv = document.getElementById('nav');
             try {
-                const navresponse = await fetch(contentDir + "navigation.md", { cache: "no-store"});
+                const navresponse = await fetch(CONTENT_ROOT + "navigation.md", { cache: "no-store"});
                 if (!navresponse.ok) throw new Error(`Could not fetch navigation.md`);
 
                 const navmarkdown = await navresponse.text();
@@ -80,9 +102,27 @@
             }
         }
 
-        // Initial Load: Check hash or load default
         window.addEventListener('DOMContentLoaded', () => {
+            const renderer = new marked.Renderer();
+
+            // Resolve Image paths manually
+            renderer.image = ({ href, title, text }) => {
+                const out = getRelativePagePath(href);
+                return `<img src="${CONTENT_REL_DIR}${out}" alt="${text}" title="${title || ''}">`;
+            };
+    
+            // Resolve Link paths manually
+            renderer.link = ({ href, title, text }) => {
+                if (href.toLowerCase().endsWith('.md') && !href.startsWith('http')) {
+                    const out = getRelativePagePath(href);
+                    return `<a href="?page=${out}" title="${title || ''}">${text}</a>`;
+                }
+                // Standard external or non-md links
+                return `<a href="${href}" target="_blank">${text}</a>`;
+            };
+
             marked.use({
+                renderer,
                 gfm: true,
                 breaks: true, // Converts \n in paragraphs to <br> (GitHub style)
                 headerIds: true,
@@ -90,32 +130,25 @@
             });
 
             /**
-             * Intercepts clicks on <a> tags to rewrite local .md links
+             * Handle browser Back/Forward navigation
              */
-            document.addEventListener('click', (e) => {
-                const target = e.target.closest('a');
-                if (!target) return;
-    
-                const href = target.getAttribute('href');
-    
-                // Check if the link is a local markdown file
-                if (href && !href.startsWith('http') && href.toLowerCase().endsWith('.md')) {
-                    e.preventDefault();
-                    loadMarkdown(href);
+            window.addEventListener('popstate', (e) => {
+                if (e.state && e.state.path) {
+                    loadMarkdown(e.state.path, false);
+                } else {
+                    // Fallback to initial page if state is empty
+                    const params = new URLSearchParams(window.location.search);
+                    const thePage = initParams.get('page') || INITIAL_PAGE;
+                    loadMarkdown(thePage, false);
                 }
-            });
-    
-            // Handle back/forward browser buttons
-            window.addEventListener('hashchange', () => {
-                const file = window.location.hash.substring(1);
-                if (file) loadMarkdown(file);
             });
 
             loadNavigation();
 
             // Load initial file
-            const initialFile = window.location.hash.substring(1) || 'index.md';
-            loadMarkdown(initialFile);
+            const initParams = new URLSearchParams(window.location.search);
+            const initialPage = initParams.get('page') || INITIAL_PAGE;
+            loadMarkdown(initialPage, false);
         });
 
     </script>
