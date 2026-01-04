@@ -44,6 +44,15 @@
                 z-index: 100;
             }
         }
+
+        #navigation {
+            text-align: center;
+            font-size: x-large;
+        }
+        #navigation a {
+            text-decoration: none;
+            margin-right: 2rem;
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -73,6 +82,7 @@
         async function loadMarkdown(targetPath, updateHistory = true) {
             const resolvedUrl = new URL(targetPath, currentFileHref);
             const contentDiv = document.getElementById('content');
+            const navDiv = document.getElementById('navigation');
             // contentDiv.innerHTML = "Loading content...";
 
             try {
@@ -88,10 +98,38 @@
                 // Render Markdown using Marked.js
                 contentDiv.innerHTML = marked.parse(markdown);
 
+                const filename = targetPath.split("/").at(-1);
+                const quarterParts = /^(\d{4})-Q(\d{1}).md$/.exec(filename);
+                if (quarterParts) {
+                    const theyear = parseInt(quarterParts[1]);
+                    const thequarter = parseInt(quarterParts[2]);
+
+                    let prevyear = theyear;
+                    let prevquarter = thequarter - 1;
+                    if (prevquarter === 0) {
+                        prevyear = prevyear - 1;
+                        prevquarter = 4;
+                    }
+
+                    let nextyear = theyear;
+                    let nextquarter = thequarter + 1;
+                    if (nextquarter === 5) {
+                        nextyear = nextyear + 1;
+                        nextquarter = 1;
+                    }
+
+                    navDiv.innerHTML = marked.parse(`[⬅ ${prevyear}-Q${prevquarter}](${prevyear}-Q${prevquarter}.md)   [${nextyear}-Q${nextquarter} ⮕](${nextyear}-Q${nextquarter}.md)`);
+
+                    navDiv.style.display = "block";
+                } else {
+                    navDiv.style.display = "none";
+                }
+
                 const cleanTitle = resolvedUrl.pathname.replace(/\.md$/, '');
                 document.title = cleanTitle;
             } catch (err) {
                 contentDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
+                navDiv.style.display = "none";
             } finally {
                 if (updateHistory) {
                     const newUrl = `${window.location.pathname}?page=${resolvedUrl.pathname}`;
@@ -101,19 +139,19 @@
             }
         }
 
-        async function loadNavigation() {
-            const navDiv = document.getElementById('quicklaunch');
+        async function loadQuicklaunchBar() {
+            const quicklaunchDiv = document.getElementById('quicklaunch');
             try {
-                const navresponse = await fetch(CONTENT_ROOT + "quicklaunch.md", { cache: "no-store"});
-                if (!navresponse.ok) throw new Error(`Could not fetch quicklaunch.md`);
+                const quicklaunchresponse = await fetch(CONTENT_ROOT + "quicklaunch.md", { cache: "no-store"});
+                if (!quicklaunchresponse.ok) throw new Error(`Could not fetch quicklaunch.md`);
 
-                const navmarkdown = await navresponse.text();
+                const quicklaunchmarkdown = await quicklaunchresponse.text();
                 // Render Markdown using Marked.js
-                navDiv.innerHTML = marked.parse(navmarkdown);
-                navDiv.style.display = "block";
+                quicklaunchDiv.innerHTML = marked.parse(quicklaunchmarkdown);
+                quicklaunchDiv.style.display = "block";
             } catch (err) {
                 console.log(err);
-                navDiv.style.display = "none";
+                quicklaunchDiv.style.display = "none";
             }
         }
 
@@ -158,7 +196,7 @@
                 }
             });
 
-            loadNavigation();
+            loadQuicklaunchBar();
 
             // Load initial file
             const initParams = new URLSearchParams(window.location.search);
@@ -172,6 +210,7 @@
 
     <div id="quicklaunch" style="display:none"></div>
     <div id="content">Loading content...</div>
+    <div id="navigation" style="display:none"></div>
 
 </body>
 </html>
