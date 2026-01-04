@@ -15,23 +15,34 @@
             color: #333;
         }
 
-        #content {
-            border-top: 1px solid #eee;
-            margin-top: 1rem;
+        #quicklaunch {
+            position: fixed;
+            top: 0px;
+            left: 0px;
+            text-decoration: none;
+            text-align: center;
+            font-size: 24px;
+            z-index: 100;
         }
-
-        #nav {
-            margin-bottom: 2rem;
-            background: #f4f4f4;
-            padding: 1rem;
+        #quicklaunch:hover {
+            opacity: 1.0;
         }
-
-        #nav a {
-            font-weight: bold;
+        #quicklaunch a {
+            margin-left: 0.3em;
             text-decoration: none;
         }
-        #nav a:hover {
-            text-decoration: underline;
+        @media (hover: hover) {
+            #quicklaunch {
+                opacity: 0.3;
+            }
+        }
+        @media (max-width: 700px) {
+            #quicklaunch {
+                left: auto;
+                right: 0px;
+                text-align: center;
+                z-index: 100;
+            }
         }
     </style>
 
@@ -44,7 +55,11 @@
         let currentFileHref = new URL(INITIAL_PAGE, CONTENT_ROOT).href;
 
         function getRelativePagePath(href) {
-            let out = new URL(href, currentFileHref).toString();
+            if (href.startsWith('/')) {
+                return href.substring(1);
+            }
+
+            const out = new URL(href, currentFileHref).toString();
             if (out.startsWith(CONTENT_ROOT)) {
                 return out.substring(CONTENT_ROOT.length);
             }
@@ -87,10 +102,10 @@
         }
 
         async function loadNavigation() {
-            const navDiv = document.getElementById('nav');
+            const navDiv = document.getElementById('quicklaunch');
             try {
-                const navresponse = await fetch(CONTENT_ROOT + "navigation.md", { cache: "no-store"});
-                if (!navresponse.ok) throw new Error(`Could not fetch navigation.md`);
+                const navresponse = await fetch(CONTENT_ROOT + "quicklaunch.md", { cache: "no-store"});
+                if (!navresponse.ok) throw new Error(`Could not fetch quicklaunch.md`);
 
                 const navmarkdown = await navresponse.text();
                 // Render Markdown using Marked.js
@@ -155,7 +170,7 @@
 </head>
 <body>
 
-    <div id="nav" style="display:none"></div>
+    <div id="quicklaunch" style="display:none"></div>
     <div id="content">Loading content...</div>
 
 </body>
